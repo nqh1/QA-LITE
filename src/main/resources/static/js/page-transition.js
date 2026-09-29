@@ -345,7 +345,7 @@ workflowCommandParams?.addEventListener("input", updateRunButton);
         clearResult();
     };
 
-    const snapCommand = () => {
+    const snapCommand = (preserveResult = false) => {
         if (!activeCommand || !workflowEnvBlock || !workflowCommandBlock) {
             return;
         }
@@ -358,9 +358,13 @@ workflowCommandParams?.addEventListener("input", updateRunButton);
         setConnectionState(activeEnvironment.id, activeCommand.id, "connected");
         setConnectionClasses(true);
         window.setTimeout(() => workflowCommandBlock.classList.remove("is-snapping"), 190);
-        updateRunButton();
-        clearResult();
+              updateRunButton();
+
+        if (!preserveResult) {
+            clearResult();
+        }
     };
+
 
     const updateEnvironment = (environment, autoConnect = false) => {
         if (isExecuting) {
@@ -491,6 +495,10 @@ workflowCommandParams?.addEventListener("input", updateRunButton);
         });
 
         commandBlock.addEventListener("dragstart", (event) => {
+                if (isExecuting) {
+        event.preventDefault();
+        return;
+    }
             event.dataTransfer.setData("text/plain", commandBlock.dataset.command);
             event.dataTransfer.effectAllowed = "copy";
             commandBlock.classList.add("is-dragging");
@@ -589,7 +597,18 @@ workflowCommandParams?.addEventListener("input", updateRunButton);
         if (isExecuting) {
     return;
 }
+const hasEmptyInput = Array.from(
+    workflowCommandParams?.querySelectorAll("[data-param-name]") || []
+).some((input) => input.value.trim() === "");
+
+if (hasEmptyInput) {
+    updateRunButton();
+    return;
+}
 isExecuting = true;
+workflowCommandParams?.querySelectorAll("[data-param-name]").forEach((input) => {
+    input.readOnly = true;
+});
 
 
         runButton.disabled = true;
@@ -598,7 +617,27 @@ isExecuting = true;
 
         try {
             const response = await executeCommand(activeEnvironment.envId, activeCommand.sqlId, collectParameterValues());
+            const contentType = response.headers.get("content-type") || "";
+
+if (
+    response.redirected ||
+    (!contentType.includes("application/json") &&
+     !contentType.includes("+json"))
+) {
+    throw new Error("Unexpected server response");
+}
             const payload = await response.json();
+            if (
+    !payload ||
+    typeof payload !== "object" ||
+    Array.isArray(payload)
+) {
+    throw new Error("Invalid server response");
+}
+
+if (response.ok && typeof payload.success !== "boolean") {
+    throw new Error("Missing execution status");
+}
 
             if (!response.ok) {
                 resultOutput.innerHTML = `
@@ -622,15 +661,24 @@ isExecuting = true;
             }
 
             let resultBody;
-            if (payload.rowsAffected !== null && payload.rowsAffected !== undefined) {
-                resultBody = `<p>${payload.rowsAffected} row(s) affected.</p>`;
-            } else if (payload.rows.length === 0) {
-                resultBody = "<p>The query ran successfully and returned no rows.</p>";
-            } else {
-                resultBody = buildTable(payload.columns, payload.rows);
-            }
 
-            resultOutput.innerHTML = `
+if (payload.rowsAffected !== null && payload.rowsAffected !== undefined) {
+    resultBody = `<p>${escapeHtml(payload.rowsAffected)} row(s) affected.</p>`;
+} else {
+    if (
+        !Array.isArray(payload.columns) ||
+        !Array.isArray(payload.rows) ||
+        !payload.rows.every(Array.isArray)
+    ) {
+        throw new Error("Invalid query results");
+    }
+
+    if (payload.rows.length === 0) {
+        resultBody = "<p>The query ran successfully and returned no rows.</p>";
+    } else {
+        resultBody = buildTable(payload.columns, payload.rows);
+    }
+}
                 <div class="result-status">
                     <span>SUCCESS</span>
                     <span>${escapeHtml(payload.environmentName ?? "")}</span>
@@ -642,17 +690,22 @@ isExecuting = true;
                 <div class="result-status">
                     <span>ERROR</span>
                 </div>
-                <p>Could not reach the server. Please try again.</p>
+                <p>The execution result could not be confirmed. Check execution history before retrying; the command may have run.</p>
             `;
         } finally {
-            isExecuting = false;
-            updateRunButton();
-        }
+    isExecuting = false;
+
+    workflowCommandParams?.querySelectorAll("[data-param-name]").forEach((input) => {
+        input.readOnly = false;
+    });
+
+    updateRunButton();
+}
     });
 
     window.addEventListener("resize", () => {
         if (connectionState.connectionStatus === "connected") {
-            snapCommand();
+                       snapCommand(true);
             return;
         }
 
