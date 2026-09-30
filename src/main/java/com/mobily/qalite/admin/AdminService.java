@@ -55,6 +55,9 @@ public class AdminService {
         String normalizedJdbcUrl = required(jdbcUrl, "JDBC URL", MAX_JDBC_URL_LENGTH);
         targetDatabaseType.validateJdbcUrl(normalizedJdbcUrl);
         validateNoEmbeddedCredentials(normalizedJdbcUrl);
+        if (!StringUtils.hasText(dbPasswordValue)) {
+    throw new IllegalArgumentException("Database password is required");
+}
 
         jdbcTemplate.update("""
                 insert into environments (name, description, db_type, jdbc_url, db_username, db_password_enc)
@@ -65,7 +68,7 @@ public class AdminService {
                 targetDatabaseType.name(),
                 normalizedJdbcUrl,
                 required(dbUsername, "Database username", MAX_DB_USERNAME_LENGTH),
-                secretCipherService.encrypt(required(dbPasswordValue, "Database password value"))
+                secretCipherService.encrypt(dbPasswordValue)
         );
     }
 
@@ -250,11 +253,22 @@ public class AdminService {
     }
 
     private static void validatePermissionIdCount(List<Long> ids, String fieldName) {
-        if (ids != null && ids.size() > MAX_PERMISSION_IDS) {
-            throw new IllegalArgumentException(fieldName + " exceeded the allowed limit");
-        }
+    if (ids == null) {
+        return;
     }
 
+    if (ids.size() > MAX_PERMISSION_IDS) {
+        throw new IllegalArgumentException(fieldName + " exceeded the allowed limit");
+    }
+
+    for (Long id : ids) {
+        if (id == null || id <= 0) {
+            throw new IllegalArgumentException(
+                    fieldName + " must contain valid positive IDs"
+            );
+        }
+    }
+}
     private static void validateNoEmbeddedCredentials(String jdbcUrl) {
         String normalizedUrl = jdbcUrl.toLowerCase();
         if (normalizedUrl.matches(".*[?&;](user|username|password)=.*")) {
