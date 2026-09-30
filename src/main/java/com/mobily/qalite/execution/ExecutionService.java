@@ -44,6 +44,11 @@ public class ExecutionService {
             String clientIp,
             Map<String, String> parameters
     ) {
+        if (environmentId <= 0 || sqlId <= 0) {
+    throw new IllegalArgumentException(
+            "Environment ID and SQL command ID must be positive"
+    );
+}
         if (!admin && !isEnvironmentAllowed(username, environmentId)) {
             throw new AccessDeniedException("This environment is not allowed for your account");
         }
@@ -54,12 +59,22 @@ public class ExecutionService {
         long userId = requireUserId(username);
         String sqlText = loadSqlText(sqlId);
         Map<String, String> parameterValues = parameters == null ? Map.of() : parameters;
-        TargetDatabaseConnection connection = targetDatabaseConnectionService.getEnvironmentConnection(environmentId);
+        List<String> statements = SqlScriptSplitter.split(sqlText);
 
+if (statements.isEmpty()) {
+    throw new IllegalArgumentException("SQL command is empty");
+}
+
+for (String singleStatement : statements) {
+    SqlParameterParser.prepare(singleStatement, parameterValues);
+}
+        TargetDatabaseConnection connection = targetDatabaseConnectionService.getEnvironmentConnection(environmentId);
+boolean executionCompleted = false;
         try (HikariDataSource dataSource = targetDatabaseConnectionService.createDataSource(connection)) {
             JdbcTemplate targetJdbcTemplate = new JdbcTemplate(dataSource);
             StatementOutcome outcome = targetJdbcTemplate.execute((ConnectionCallback<StatementOutcome>)
                     targetConnection -> runStatement(targetConnection, sqlText, parameterValues));
+                    executionCompleted = true;
 
             recordHistory(userId, environmentId, sqlId, "SUCCESS", outcome.recordsReturned(), outcome.rowsAffected(), null, clientIp);
             return new ExecutionResult(
@@ -71,6 +86,18 @@ public class ExecutionService {
                     null
             );
         } catch (RuntimeException exception) {
+            if (executionCompleted) {
+    LOGGER.error(
+            "SQL execution completed, but finalization failed for environment {} / sql {}",
+            environmentId, sqlId, exception
+    );
+
+    throw new IllegalStateException(
+            "SQL execution completed, but saving its history or closing resources failed. "
+                    + "Do not retry the command before an administrator verifies the outcome.",
+            exception
+    );
+}
             LOGGER.warn("Execution failed for environment {} / sql {}", environmentId, sqlId, exception);
             recordHistory(userId, environmentId, sqlId, "FAILED", null, null, exception.getMessage(), clientIp);
             return new ExecutionResult(
@@ -260,10 +287,17 @@ public class ExecutionService {
         if (texts.isEmpty()) {
             throw new IllegalArgumentException("SQL command does not exist");
         }
-        return texts.getFirst();
+        String sqlText = texts.getFirst();
+
+if (sqlText == null || sqlText.isBlank()) {
+    throw new IllegalArgumentException("SQL command is empty");
+}
+
+return sqlText;
     }
 
     private void recordHistory(
+
             long userId,
             long environmentId,
             long sqlId,
