@@ -679,6 +679,7 @@ if (payload.rowsAffected !== null && payload.rowsAffected !== undefined) {
         resultBody = buildTable(payload.columns, payload.rows);
     }
 }
+                resultOutput.innerHTML = `
                 <div class="result-status">
                     <span>SUCCESS</span>
                     <span>${escapeHtml(payload.environmentName ?? "")}</span>
