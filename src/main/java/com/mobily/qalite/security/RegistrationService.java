@@ -13,7 +13,7 @@ public class RegistrationService {
     private static final int MIN_USERNAME_LENGTH = 3;
     private static final int MAX_USERNAME_LENGTH = 100;
     private static final int MIN_PASSWORD_LENGTH = 8;
-    private static final int MAX_PASSWORD_LENGTH = 128;
+    private static final int MAX_PASSWORD_BYTES = 72;
     private static final String USERNAME_PATTERN = "[A-Za-z0-9._-]+";
     private static final String DEFAULT_ROLE = "QA_USER";
 
@@ -28,7 +28,11 @@ public class RegistrationService {
     @Transactional
     public void register(String username, String password) {
         String normalizedUsername = required(username, "Username");
-        String rawPassword = required(password, "Password");
+        if (!StringUtils.hasText(password)) {
+    throw new IllegalArgumentException("Password is required");
+}
+
+String rawPassword = password;
 
         validateUsername(normalizedUsername);
         validatePassword(rawPassword);
@@ -57,10 +61,19 @@ public class RegistrationService {
     }
 
     private static void validatePassword(String password) {
-        if (password.length() < MIN_PASSWORD_LENGTH || password.length() > MAX_PASSWORD_LENGTH) {
-            throw new IllegalArgumentException("Password must be between 8 and 128 characters");
-        }
+    if (password.length() < MIN_PASSWORD_LENGTH) {
+        throw new IllegalArgumentException(
+                "Password must contain at least 8 characters"
+        );
     }
+
+    if (password.getBytes(java.nio.charset.StandardCharsets.UTF_8).length
+            > MAX_PASSWORD_BYTES) {
+        throw new IllegalArgumentException(
+                "Password is too long. Maximum size is 72 UTF-8 bytes."
+        );
+    }
+}
 
     private static String required(String value, String fieldName) {
         if (!StringUtils.hasText(value)) {
