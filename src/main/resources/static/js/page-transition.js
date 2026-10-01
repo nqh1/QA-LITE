@@ -101,23 +101,38 @@ if (loginPage && loginForm) {
 
         loginError?.classList.add("is-hidden");
         setButtonState(submitButton, "Signing in...", true);
+        let failureMessage = "Could not reach the server. Check your connection and try again.";
 
         try {
             const response = await postForm(loginForm);
 
-            if (!response.ok || isLoginFailureResponse(response, loginUrl)) {
-                throw new Error("Login failed");
-            }
+if (!response.ok || isLoginFailureResponse(response, loginUrl)) {
+    if (response.status === 429) {
+        failureMessage = "Too many login attempts. Wait one minute and try again.";
+    } else if (response.status === 403) {
+        failureMessage = "Sign-in request could not be verified. Refresh the page and try again.";
+    } else if (response.status >= 500) {
+        failureMessage = "Sign-in is temporarily unavailable. Please try again later.";
+    } else if (response.status === 401 || isLoginFailureResponse(response, loginUrl)) {
+        failureMessage = "Invalid username or password.";
+    } else {
+        failureMessage = "Sign-in could not be completed. Refresh the page and try again.";
+    }
+    throw new Error("Login failed");
+}
 
             loginPage.classList.remove("is-returning", "is-entered");
             startPageExit(loginPage);
             window.setTimeout(() => {
                 window.location.assign(successUrl);
             }, 760);
-        } catch (error) {
-            loginError?.classList.remove("is-hidden");
-            setButtonState(submitButton, "Login", false);
-        }
+} catch (error) {
+    if (loginError) {
+        loginError.textContent = failureMessage;
+        loginError.classList.remove("is-hidden");
+    }
+    setButtonState(submitButton, "Login", false);
+}
     });
 }
 
