@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.mobily.qalite.execution.SqlScriptSplitter;
 import com.mobily.qalite.security.SecretCipherService;
 import com.mobily.qalite.targetdb.TargetDatabaseType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -75,7 +76,11 @@ public class AdminService {
     @Transactional
     public void createSqlDefinition(String sqlName, String sqlDescription, String sqlText) {
         String normalizedSqlText = required(sqlText, "SQL text", MAX_SQL_TEXT_LENGTH);
-
+        if (SqlScriptSplitter.split(normalizedSqlText).isEmpty()) {
+    throw new IllegalArgumentException(
+            "SQL must contain at least one executable statement"
+    );
+}
         jdbcTemplate.update("""
                 insert into sql_definitions (sql_name, sql_description, sql_text)
                 values (?, ?, ?)

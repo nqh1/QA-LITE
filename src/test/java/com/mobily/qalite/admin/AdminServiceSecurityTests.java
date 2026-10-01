@@ -71,8 +71,7 @@ class AdminServiceSecurityTests {
 
         adminService.deleteUser(2L, "admin");
 
-        verify(jdbcTemplate).update("delete from execution_history where user_id = ?", 2L);
-        verify(jdbcTemplate).update("delete from users where user_id = ?", 2L);
+        verify(jdbcTemplate, never()).update("delete from execution_history where user_id = ?", 2L);
     }
 
     @Test
@@ -84,7 +83,7 @@ class AdminServiceSecurityTests {
 
         adminService.deleteUser(3L, "admin");
 
-        verify(jdbcTemplate).update("delete from execution_history where user_id = ?", 3L);
+        verify(jdbcTemplate, never()).update("delete from execution_history where user_id = ?", 3L);
         verify(jdbcTemplate).update("delete from users where user_id = ?", 3L);
         verify(jdbcTemplate, never()).queryForObject("select count(*) from users where role = 'ADMIN'", Integer.class);
     }

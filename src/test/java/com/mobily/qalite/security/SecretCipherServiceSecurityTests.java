@@ -27,10 +27,14 @@ class SecretCipherServiceSecurityTests {
         assertThrows(IllegalStateException.class, () -> secretCipherService.encrypt("secret"));
     }
 
-    @Test
-    void legacyPlaintextSecretsCanStillBeRead() {
-        SecretCipherService secretCipherService = new SecretCipherService("");
+@Test
+void plaintextSecretsAreRejected() {
+    SecretCipherService secretCipherService =
+            new SecretCipherService("security-test-key");
 
-        assertEquals("legacy-secret", secretCipherService.decrypt("legacy-secret"));
-    }
+    assertThrows(
+            IllegalArgumentException.class,
+            () -> secretCipherService.decrypt("legacy-secret")
+    );
+}
 }

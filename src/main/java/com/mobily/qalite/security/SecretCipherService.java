@@ -56,9 +56,9 @@ public class SecretCipherService {
     }
 
     public String decrypt(String storedValue) {
-        if (!StringUtils.hasText(storedValue) || !storedValue.startsWith(ENCRYPTED_PREFIX)) {
-            return storedValue;
-        }
+if (!StringUtils.hasText(storedValue) || !storedValue.startsWith(ENCRYPTED_PREFIX)) {
+    throw new IllegalArgumentException("Stored database password must be encrypted");
+}
 
         requireConfiguredKey();
 

@@ -38,14 +38,14 @@ import java.util.Set;
  *       to the driver.</li>
  * </ul>
  */
-final class SqlScriptSplitter {
+public final class SqlScriptSplitter {
 
     private static final Set<String> BLOCK_CONTROL_CLOSERS = Set.of("IF", "LOOP", "CASE", "WHILE");
 
     private SqlScriptSplitter() {
     }
 
-    static List<String> split(String script) {
+public static List<String> split(String script) {
         List<String> statements = new ArrayList<>();
         StringBuilder current = new StringBuilder();
 

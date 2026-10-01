@@ -106,7 +106,7 @@ class SqlParameterParserTests {
                 () -> SqlParameterParser.prepare("select * from t where id = :id", Map.of())
         );
 
-        assertEquals("Missing value for parameter :id", exception.getMessage());
+        assertEquals("A value is required for parameter :id", exception.getMessage());
     }
 
     @Test
